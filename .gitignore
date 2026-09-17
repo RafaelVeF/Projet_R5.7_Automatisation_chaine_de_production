@@ -1,0 +1,41 @@
+# =========================
+# Fichiers Généraux & OS
+# =========================
+.DS_Store
+Thumbs.db
+.env
+.env.local
+
+# =========================
+# IDEs & Editeurs
+# =========================
+.vscode/
+.idea/
+*.suo
+*.user
+
+# =========================
+# IHM (Node.js / React / Vue)
+# =========================
+ihm/node_modules/
+ihm/dist/
+ihm/build/
+npm-debug.log
+yarn-error.log
+
+# =========================
+# Ambassadeur (Python)
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+ambassadeur/venv/
+ambassadeur/env/
+.pytest_cache/
+
+# =========================
+# DataAccess (C# / .NET)
+# =========================
+data-access/bin/
+data-access/obj/
+*.userprefs
