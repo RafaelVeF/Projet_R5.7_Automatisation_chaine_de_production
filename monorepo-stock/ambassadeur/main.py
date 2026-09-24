@@ -1,10 +1,11 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
+import os
+import httpx
 
 app = FastAPI(title="Ambassadeur API")
 
-# Configuration CORS indispensable pour que React (sur un autre port) puisse communiquer
+# Configuration CORS pour autoriser l'interface Web
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -13,18 +14,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+POST_TRAITEMENT_URL = os.getenv("POST_TRAITEMENT_URL", "http://localhost:8002")
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "ambassadeur"}
+
+
 @app.post("/api/scan")
 async def process_scan(file: UploadFile = File(...)):
-    # 1. On lit le fichier (pour vérifier qu'on le reçoit bien)
     content = await file.read()
-    
-    # 2. On simule un délai de traitement de 1.5 seconde (comme si on appelait le post-traitement)
-    await asyncio.sleep(1.5)
-    
-    # 3. On renvoie une fausse réponse de succès pour valider la communication
-    return {
-        "status": "success",
-        "message": f"Fichier '{file.filename}' reçu par l'Ambassadeur (taille: {len(content)} octets).",
-        "post_traitement_data": {"code_detecte": "QR-TEST-123", "action": "entree_stock"},
-        "datawarehouse_result": {"stock_mis_a_jour": True, "nouveau_stock": 42}
-    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{POST_TRAITEMENT_URL}/api/decode",
+                files={"file": (file.filename, content, file.content_type or "image/png")},
+            )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {
+                "status": "error",
+                "message": f"Erreur du service post-traitement (HTTP {response.status_code})",
+                "data": None
+            }
+    except httpx.RequestError as exc:
+        return {
+            "status": "error",
+            "message": f"Impossible de contacter le service post-traitement ({exc})",
+            "data": None
+        }
