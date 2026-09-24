@@ -16,3 +16,19 @@ docker compose up --build
 ```
 
 L'interface est accessible sur http://localhost:8080
+
+# Guide
+
+Pour lancer l'Ambassadeur (Terminal 1) :
+
+cd monorepo-stock/ambassadeur
+python -m venv venv
+.\venv\Scripts\activate
+python -m pip install -r requirements.txt
+python -m uvicorn main:app --port 8000 --reload
+
+Pour lancer le Web (Terminal 2) :
+
+cd monorepo-stock/web
+npm install
+npm run dev
