@@ -1,0 +1,107 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: monorepo-stock-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-stockdb}
+      POSTGRES_USER: ${POSTGRES_USER:-stockuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stockpass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stockuser} -d ${POSTGRES_DB:-stockdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: monorepo-stock-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: ./web
+    container_name: monorepo-stock-web
+    restart: unless-stopped
+    depends_on:
+      ambassadeur:
+        condition: service_started
+      post-traitement:
+        condition: service_started
+      datawarehouse:
+        condition: service_started
+    ports:
+      - "8080:80"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
+
+  ambassadeur:
+    build:
+      context: ./ambassadeur
+    container_name: monorepo-stock-ambassadeur
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      POST_TRAITEMENT_URL: ${POST_TRAITEMENT_URL:-http://post-traitement:8000}
+    ports:
+      - "8001:8000"
+    depends_on:
+      post-traitement:
+        condition: service_started
+
+  post-traitement:
+    build:
+      context: ./post-traitement
+    container_name: monorepo-stock-post-traitement
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DATAWAREHOUSE_URL: ${DATAWAREHOUSE_URL:-http://datawarehouse:8080}
+    ports:
+      - "8002:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  datawarehouse:
+    build:
+      context: ./datawarehouse
+    container_name: monorepo-stock-datawarehouse
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: ${CONNECTIONSTRINGS__DEFAULTCONNECTION:-Host=postgres;Database=stockdb;Username=stockuser;Password=stockpass}
+      REDIS_CONNECTION_STRING: ${REDIS_CONNECTION_STRING:-redis:6379}
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
