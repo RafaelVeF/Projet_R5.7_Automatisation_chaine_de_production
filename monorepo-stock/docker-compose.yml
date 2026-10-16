@@ -7,8 +7,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-stockdb}
       POSTGRES_USER: ${POSTGRES_USER:-stockuser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stockpass}
-    ports:
-      - "5432:5432"
+    # Ports internes commentés : selon consignes, seul le port 8080 doit être exposé sur l'hôte
+    # Décommenter si besoin d'accès direct pour debug local
+    # ports:
+    #   - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,8 +24,8 @@ services:
     container_name: monorepo-stock-redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6379:6379"
+    # ports:
+    #   - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -46,8 +48,6 @@ services:
         condition: service_started
     ports:
       - "8080:80"
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
 
   ambassadeur:
     build:
@@ -59,8 +59,8 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       POST_TRAITEMENT_URL: ${POST_TRAITEMENT_URL:-http://post-traitement:8000}
-    ports:
-      - "8001:8000"
+    # ports:
+    #   - "8001:8000"
     depends_on:
       post-traitement:
         condition: service_started
@@ -75,8 +75,8 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       DATAWAREHOUSE_URL: ${DATAWAREHOUSE_URL:-http://datawarehouse:8080}
-    ports:
-      - "8002:8000"
+    # ports:
+    #   - "8002:8000"
     depends_on:
       redis:
         condition: service_healthy
@@ -94,8 +94,8 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__DefaultConnection: ${CONNECTIONSTRINGS__DEFAULTCONNECTION:-Host=postgres;Database=stockdb;Username=stockuser;Password=stockpass}
       REDIS_CONNECTION_STRING: ${REDIS_CONNECTION_STRING:-redis:6379}
-    ports:
-      - "8081:8080"
+    # ports:
+    #   - "8081:8080"
     depends_on:
       postgres:
         condition: service_healthy
