@@ -5,6 +5,7 @@ Responsabilité : Analyse une image reçue et extrait le texte encodé (QR Code 
 from fastapi import FastAPI, File, UploadFile
 import cv2 as cv
 import numpy as np
+from pyzbar.pyzbar import decode as zbar_decode
 
 app = FastAPI(title="Post-Traitement API", description="Décodage optique QR Code et Codes-Barres")
 
@@ -16,24 +17,12 @@ async def health():
 
 
 def decode_optical_code(image: np.ndarray) -> tuple[bool, str, str]:
-    """
-    Tente de décoder un QR code, puis à défaut un code-barres 1D.
-    Retourne : (succès: bool, type_code: str, valeur: str)
-    """
-    # 1. Détection QR Code (2D)
-    qr_detector = cv.QRCodeDetector()
-    data, _, _ = qr_detector.detectAndDecode(image)
-    if data:
-        return True, "QR Code", data
-
-    # 2. Détection Code-barres (1D)
-    if hasattr(cv, "barcode"):
-        barcode_detector = cv.barcode.BarcodeDetector()
-        data_bc, _, _ = barcode_detector.detectAndDecode(image)
-        if data_bc:
-            val = data_bc[0] if isinstance(data_bc, (list, tuple)) else data_bc
-            if val:
-                return True, "Code-Barres", val
+    results = zbar_decode(image)
+    if results:
+        code = results[0]
+        code_type = code.type  # ex: "QRCODE", "EAN13", "CODE128"
+        value = code.data.decode("utf-8")
+        return True, code_type, value
 
     return False, "", ""
 
@@ -46,29 +35,15 @@ async def decode_image(file: UploadFile = File(...)):
         return {"status": "error", "message": "Fichier image vide.", "data": None}
 
     # Décodage de l'image en mémoire
-    nptab = np.frombuffer(content, np.uint8)
-    image = cv.imdecode(nptab, cv.IMREAD_COLOR)
-
+    image = cv.imdecode(np.frombuffer(content, np.uint8), cv.IMREAD_COLOR)
     if image is None:
-        return {
-            "status": "error",
-            "message": "Format d'image non reconnu ou corrompu.",
-            "data": None
-        }
+        return {"status": "error", "message": "Format d'image non reconnu ou corrompu.", "data": None}
 
     found, code_type, value = decode_optical_code(image)
     if found:
-        return {
-            "status": "ok",
-            "message": f"{code_type} détecté avec succès",
-            "data": value
-        }
+        return {"status": "ok", "message": f"{code_type} détecté avec succès", "data": value}
 
-    return {
-        "status": "error",
-        "message": "Aucun QR code ni code-barres détecté dans l'image.",
-        "data": None
-    }
+    return {"status": "error", "message": "Aucun QR code ni code-barres détecté dans l'image.", "data": None}
 
 
 if __name__ == "__main__":
